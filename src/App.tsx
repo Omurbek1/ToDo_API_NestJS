@@ -7,11 +7,12 @@ import axios from "axios";
 type Todo = {
   id: number;
   title: string;
-  status: boolean;
+  status: "done" | "in progress" | "to do";
 };
 
 function App() {
-  const [getToDo, setToDo] = useState([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [newTodo, setNewTodo] = useState("");
 
   useEffect(() => {
     fetchToDo();
@@ -20,40 +21,91 @@ function App() {
     try {
       const response = await axios.get("http://localhost:3000/todos");
       console.log(response?.data, "response");
-      setToDo(response?.data);
+      setTodos(response?.data);
     } catch (error) {
-      console.log(error);
+      console.error("Ошибка:", error);
     }
   };
 
-  const addToDo = async () => {
+  const addTodo = async () => {
+    if (newTodo.trim() !== "") {
+      const todo: Todo = {
+        title: newTodo,
+        status: "to do",
+      };
+      try {
+        await axios.post("http://localhost:3000/todos", todo);
+        setTodos([...todos, todo]);
+        setNewTodo("");
+      } catch (error) {
+        console.error("Ошибка:", error);
+      }
+    }
+  };
+  const toggleTodoStatus = async (id: number) => {
+    const updatedTodos = todos.map((todo) => {
+      if (todo.id === id) {
+        if (todo.status === "done") {
+          return { ...todo, status: "in progress" };
+        } else if (todo.status === "in progress") {
+          return { ...todo, status: "to do" };
+        } else {
+          return { ...todo, status: "done" };
+        }
+      }
+      return todo;
+    });
     try {
-      const response = await axios.post("http://localhost:3000/todos", {
-        title: "hello s",
-        status: "how are you",
+      await axios.put(`http://localhost:3000/todos/${id}`, {
+        status: updatedTodos.find((todo) => todo.id === id)?.status,
       });
-      return response;
+      setTodos(updatedTodos);
     } catch (error) {
-      console.log(error);
+      console.error("Ошибка:", error);
+    }
+  };
+
+  const deleteTodo = async (id: number) => {
+    try {
+      await axios.delete(`http://localhost:3000/todos/${id}`);
+      const updatedTodos = todos.filter((todo) => todo.id !== id);
+      setTodos(updatedTodos);
+    } catch (error) {
+      console.error("Ошибка:", error);
     }
   };
   return (
     <>
       <div>
+        <h1>Todo List</h1>
+        <input
+          type="text"
+          value={newTodo}
+          onChange={(e) => setNewTodo(e.target.value)}
+          placeholder="Введите новое задание"
+        />
+        <button onClick={addTodo}>Добавить</button>
         <div>
-          {getToDo.map((item) => {
-            return (
-              <>
-                <div>
-                  <h6>
-                    {item.title}
-                    <p>{item.status}</p>
-                  </h6>
-                </div>
-              </>
-            );
-          })}
-          <button onClick={addToDo}></button>
+          <ul>
+            {todos.map((todo) => (
+              <li key={todo.id}>
+                <input
+                  type="checkbox"
+                  checked={todo.status === "done"}
+                  onChange={() => toggleTodoStatus(todo.id)}
+                />
+                <span
+                  style={{
+                    textDecoration:
+                      todo.status === "done" ? "line-through" : "none",
+                  }}
+                >
+                  {todo.title}
+                </span>
+                <button onClick={() => deleteTodo(todo.id)}>Удалить</button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </>
